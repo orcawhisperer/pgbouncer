@@ -1,237 +1,229 @@
-// terraform code to deploy postgresql cloud sql instance with HA enabled 
-
 provider "google" {
   project = var.project_id
-  region  = var.region
-  zone    = var.zone
+  region  = "us-central1"
 }
 
-// Create a VPC network and subnet and Cloud SQL HA instance 
+# module "cloudsql_instance" {
+#   source = "terraform-google-modules/sql-db/google//modules/postgres"
 
-module "network" {
-  source = "terraform-google-modules/network/google"
+#   project_id          = var.project_id
+#   region              = var.region
+#   name                = var.instance_name
+#   database_version    = "POSTGRES_13"
+#   tier                = "db-n1-standard-2"
+#   high_availability   = true
+#   create_replica      = true
+#   replica_region_list = ["us-east1", "us-west1"]
 
-  project_id   = var.project_id
-  network_name = "pgbouncer-network"
-  routing_mode = "GLOBAL"
+#   network_name    = module.vpc_network.network_name
+#   subnet_name     = module.vpc_network.subnets["us-central1-subnet"].name
+#   private_network = true
+
+#   labels = {
+#     environment = var.environment
+#   }
+
+#   users = [
+#     {
+#       name     = var.db_username
+#       password = var.db_password
+#       roles    = ["cloudsqlsuperuser"]
+#     }
+#   ]
+# }
+
+# output "connection_string" {
+#   value = module.cloudsql_instance.connection_name
+# }
+
+# output "replica_connection_strings" {
+#   value = module.cloudsql_instance.replica_connection_names
+# }
+
+
+# module "cloudsql" {
+#   source = "terraform-google-modules/cloudsql/google"
+
+#   project_id           = "<your-project-id>"
+#   name                 = "my-cloudsql-instance"
+#   region               = "us-central1"
+#   tier                 = "db-n1-standard-1"
+#   database_version     = "POSTGRES_13"
+#   authorized_networks  = ["10.0.0.0/16"]
+#   backup_configuration = {}
+
+#   ha = true
+
+#   read_replica_zones = [
+#     "us-east1-b",
+#     "us-west1-a",
+#     "asia-east1-a",
+#   ]
+
+#   read_replica_zones_fallback = [
+#     "us-east4-a",
+#     "europe-west3-a",
+#     "asia-southeast1-a",
+#   ]
+
+#   maintenance_window = {
+#     day  = 6
+#     hour = 2
+#   }
+
+#   backup_window = {
+#     start_time = "22:00"
+#     end_time   = "02:00"
+#   }
+
+# }
+
+
+# data "cloudsql_database_instance" "primary" {
+#   name = module.cloudsql.primary_instance_name
+# }
+
+# data "cloudsql_database_instance" "replica" {
+#   name = module.cloudsql.replica_instance_name
+# }
+
+module "vpc_network" {
+  source  = "terraform-google-modules/network/google"
+  version = "5.1.0"
+
+  project_id   = "<your-project-id>"
+  network_name = "my-custom-vpc"
+
   subnets = [
     {
-      subnet_name   = "subnet-1"
-      subnet_ip     = "10.10.10.0/24"
-      subnet_region = "us-west1"
-
+      subnet_name           = "us-central1-subnet"
+      subnet_ip             = "10.0.1.0/24"
+      subnet_region         = "us-central1"
+      subnet_private_access = true
     },
     {
-      subnet_name   = "subnet-2"
-      subnet_ip     = "10.10.20.0/24"
-      subnet_region = "us-west2"
+      subnet_name           = "us-east1-subnet"
+      subnet_ip             = "10.0.2.0/24"
+      subnet_region         = "us-east1"
+      subnet_private_access = true
     },
     {
-      subnet_name   = "subnet-3"
-      subnet_ip     = "10.10.30.0/24"
-      subnet_region = "us-west3"
-    }
+      subnet_name           = "us-west1-subnet"
+      subnet_ip             = "10.0.3.0/24"
+      subnet_region         = "us-west1"
+      subnet_private_access = true
+    },
   ]
 
-}
-
-locals {
-  read_replica_ip_configuration = {
-    ipv4_enabled       = true
-    require_ssl        = false
-    private_network    = null
-    allocated_ip_range = null
-    authorized_networks = [
+  secondary_ranges = {
+    us-central1-subnet = [
       {
-        name  = "${var.project_id}-cidr"
-        value = var.pg_ha_external_ip_range
-      },
+        range_name    = "us-central1-subnet"
+        ip_cidr_range = "10.0.1.128/25"
+      }
+    ],
+    us-east1-subnet = [
+      {
+        range_name    = "us-east1-subnet"
+        ip_cidr_range = "10.0.2.128/25"
+      }
+    ],
+    us-west1-subnet = [
+      {
+        range_name    = "us-west1-subnet"
+        ip_cidr_range = "10.0.3.128/25"
+      }
     ]
   }
 }
 
-module "pg" {
-  source               = "GoogleCloudPlatform/sql-db/google//modules/postgresql"
-  version              = "8.0.0"
-  name                 = var.pg_ha_name
-  random_instance_name = true
-  project_id           = var.project_id
-  database_version     = "POSTGRES_12"
-  region               = "us-central1"
+# data "google_sql_database_instance" "my_instance" {
+#   name = "my-cloudsql-instance"
+# }
 
-  // Master configurations
-  tier                            = "db-custom-1-3840"
-  zone                            = "us-central1-c"
-  availability_type               = "REGIONAL"
-  maintenance_window_day          = 7
-  maintenance_window_hour         = 12
-  maintenance_window_update_track = "stable"
+# data "google_sql_database_instances" "name" {
 
-  deletion_protection = false
-
-  database_flags = [{ name = "autovacuum", value = "off" }]
-
-  user_labels = {
-    foo = "bar"
-  }
-
-  ip_configuration = {
-    ipv4_enabled       = true
-    require_ssl        = true
-    private_network    = null
-    allocated_ip_range = null
-    authorized_networks = [
-      {
-        name  = "${var.project_id}-cidr"
-        value = var.pg_ha_external_ip_range
-      },
-    ]
-  }
-
-  backup_configuration = {
-    enabled                        = true
-    start_time                     = "20:55"
-    location                       = null
-    point_in_time_recovery_enabled = false
-    transaction_log_retention_days = null
-    retained_backups               = 365
-    retention_unit                 = "COUNT"
-  }
-
-  // Read replica configurations
-  read_replica_name_suffix = "-test"
-  read_replicas = [
-    {
-      name                  = "0"
-      zone                  = "us-central1-a"
-      availability_type     = "REGIONAL"
-      tier                  = "db-custom-1-3840"
-      ip_configuration      = local.read_replica_ip_configuration
-      database_flags        = [{ name = "autovacuum", value = "off" }]
-      disk_autoresize       = null
-      disk_autoresize_limit = null
-      disk_size             = null
-      disk_type             = "PD_HDD"
-      user_labels           = { bar = "baz" }
-      encryption_key_name   = null
-    },
-    {
-      name                  = "1"
-      zone                  = "us-central1-b"
-      availability_type     = "REGIONAL"
-      tier                  = "db-custom-1-3840"
-      ip_configuration      = local.read_replica_ip_configuration
-      database_flags        = [{ name = "autovacuum", value = "off" }]
-      disk_autoresize       = null
-      disk_autoresize_limit = null
-      disk_size             = null
-      disk_type             = "PD_HDD"
-      user_labels           = { bar = "baz" }
-      encryption_key_name   = null
-    },
-    {
-      name                  = "2"
-      zone                  = "us-central1-c"
-      availability_type     = "REGIONAL"
-      tier                  = "db-custom-1-3840"
-      ip_configuration      = local.read_replica_ip_configuration
-      database_flags        = [{ name = "autovacuum", value = "off" }]
-      disk_autoresize       = null
-      disk_autoresize_limit = null
-      disk_size             = null
-      disk_type             = "PD_HDD"
-      user_labels           = { bar = "baz" }
-      encryption_key_name   = null
-    },
-  ]
-
-  db_name      = var.pg_ha_name
-  db_charset   = "UTF8"
-  db_collation = "en_US.UTF8"
-
-  additional_databases = [
-    {
-      name      = "${var.pg_ha_name}-additional"
-      charset   = "UTF8"
-      collation = "en_US.UTF8"
-    },
-  ]
-
-  user_name     = "tftest"
-  user_password = "foobar"
-
-  additional_users = [
-    {
-      name            = "tftest2"
-      password        = "abcdefg"
-      host            = "localhost"
-      random_password = false
-    },
-    {
-      name            = "tftest3"
-      password        = "abcdefg"
-      host            = "localhost"
-      random_password = false
-    },
-  ]
-}
-
-module "service_account" {
-  source     = "terraform-google-modules/service-accounts/google"
-  project_id = var.project_id
-  names      = ["pgbouncer"]
-  project_roles = [
-    "${var.project_id}=>roles/cloudsql.client",
-    "${var.project_id}=>roles/compute.networkViewer",
-    "${var.project_id}=>roles/compute.securityAdmin",
-    "${var.project_id}=>roles/iam.serviceAccountUser",
-  ]
-}
+# }
 
 
-
-// PgBouncer instance template with startup script
-module "pg_bouncer_instance_template" {
-  source       = "terraform-google-modules/vm/google//modules/instance_template"
-  region       = "us-central1"
-  project_id   = var.project_id
-  name_prefix  = "pgbouncer"
+resource "google_compute_instance" "pgbouncer_instance" {
+  name         = "pgbouncer-vm"
   machine_type = "n1-standard-1"
+  zone         = "us-central1-a"
 
-  network    = module.network.network_name
-  subnetwork = module.network.subnets[0].subnet_name
+  metadata = {
+    # Install PgBouncer and Cloud SQL Proxy
+    "pgbouncer-version"       = "1.15.0"
+    "cloud-sql-proxy-version" = "1.28.0"
+  }
 
-  startup_script = file("pgbouncer_startup_script.sh")
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-10"
+      size  = "10"
+    }
+  }
 
-  service_account = {
-    email  = module.service_account.email
+  metadata_startup_script = <<-SCRIPT
+    # Start the Cloud SQL Proxy and connect to the primary CloudSQL instance and read replica
+    /cloud_sql_proxy \
+      -instances=<INSTANCE_CONNECTION_NAME>=tcp:5432,<READ_REPLICA_CONNECTION_NAME>=tcp:5432 \
+      -credential_file=/var/secrets/cloudsql/credentials.json \
+      &
+
+    # Start PgBouncer
+    pgbouncer /etc/pgbouncer/pgbouncer.ini \
+      &
+
+    # Wait for PgBouncer to start up
+    sleep 5
+
+    # Create the PgBouncer user database and users
+    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "CREATE DATABASE ${var.db_name}"
+    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "CREATE USER ${var.db_user}"
+    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "ALTER USER ${var.db_user} PASSWORD '${var.db_password}'"
+    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${var.db_name} TO ${var.db_user}"
+
+    # Configure PgBouncer
+    echo "[databases]" > /etc/pgbouncer/userlist.txt
+    echo "<INSTANCE_CONNECTION_NAME>:<DB_NAME>:pgbouncer:<PGBOUNCER_PASSWORD>" >> /etc/pgbouncer/userlist.txt
+    echo "<READ_REPLICA_CONNECTION_NAME>:<DB_NAME>:pgbouncer:<PGBOUNCER_PASSWORD>" >> /etc/pgbouncer/userlist.txt
+    echo "" >> /etc/pgbouncer/userlist.txt
+    echo "[pgbouncer]" > /etc/pgbouncer/pgbouncer.ini
+    echo "listen_port = 6432" >> /etc/pgbouncer/pgbouncer.ini
+    echo "listen_addr = 0.0.0.0" >> /etc/pgbouncer/pgbouncer.ini
+    echo "auth_type = md5" >> /etc/pgbouncer/pgbouncer.ini
+    echo "auth_file = /etc/pgbouncer/userlist.txt" >> /etc/pgbouncer/pgbouncer.ini
+    echo "default_pool_size = 20" >> /etc/pgbouncer/pgbouncer.ini
+    echo "pool_mode = transaction" >> /etc/pgbouncer/pgbouncer.ini
+    echo "server_reset_query = DISCARD ALL" >> /etc/pgbouncer/pgbouncer.ini
+    echo "server_round_robin = 1" >> /etc/pgbouncer/pgbouncer.ini
+    echo "server_idle_timeout = 120" >> /etc/pgbouncer/pgbouncer.ini
+    echo "server_lifetime = 600" >> /etc/pgbouncer/pgbouncer.ini
+  SCRIPT
+
+  service_account {
+    email  = "default"
     scopes = ["cloud-platform"]
   }
 
-  tags = ["pgbouncer"]
-}
+  network_interface {
+    network = module.vpc_network.network_name
 
-// PgBouncer instance
-module "pg_bouncer_instance" {
-  source            = "terraform-google-modules/vm/google//modules/compute_instance"
-  instance_template = module.pg_bouncer_instance_template.self_link
-  subnetwork        = module.network.subnets[0].subnet_name
-  region            = "us-central1"
-  zone              = "us-central1-a"
-}
+    access_config {
+      # Use ephemeral IP address
+    }
 
-resource "google_compute_firewall" "pgbouncer" {
-  name    = "pgbouncer-firewall"
-  network = module.network.network_name
-  allow {
-    protocol = "tcp"
-    ports    = ["5432"]
+    subnetwork_project = module.vpc_network.project_id
+    subnetwork         = module.vpc_network.subnets["us-central1-subnet"].name
+    # subnetwork_ip      = module.vpc_network.subnets["us-central1-subnet"].ip_cidr_range
   }
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = module.pg_bouncer_instance_template.tags
 }
 
 
 
 
 
+# output "cloudsql_instance_connection_name" {
+#   value = module.cloudsql.connection_name
+# }
