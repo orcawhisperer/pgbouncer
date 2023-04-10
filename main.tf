@@ -6,6 +6,7 @@ provider "google" {
 
 
 
+
 locals {
   users    = [for u in var.users : ({ name = u.name, password = substr(u.password, 0, 3) == "md5" ? u.password : "md5${md5("${u.password}${u.name}")}" })]
   admins   = [for u in var.users : u.name if lookup(u, "admin", false) == true]
@@ -28,23 +29,6 @@ locals {
   )
 }
 
-# Define the cloud-init configuration for the instance
-# data "template_cloudinit_config" "pgbouncer_cloudinit" {
-
-#   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
-#   vars = {
-#     image       = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
-#     listen_port = var.listen_port
-#     config      = base64encode(local.cloud_config)
-#     userlist    = base64encode(local.userlist)
-#   }
-
-#   part {
-#     content_type = "text/cloud-config"
-#     content      = data.template_cloudinit_config.pgbouncer_cloudinit.rendered
-#   }
-# }
-
 data "template_file" "cloud_config" {
   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
   vars = {
@@ -55,7 +39,7 @@ data "template_file" "cloud_config" {
   }
 }
 
-data "template_cloudinit_config" "cloud_config" {
+data "cloudinit_config" "cloud_config" {
   gzip          = false
   base64_encode = false
   part {
@@ -65,89 +49,7 @@ data "template_cloudinit_config" "cloud_config" {
   }
 }
 
-# module "cloudsql_instance" {
-#   source = "terraform-google-modules/sql-db/google//modules/postgres"
 
-#   project_id          = var.project_id
-#   region              = var.region
-#   name                = var.instance_name
-#   database_version    = "POSTGRES_13"
-#   tier                = "db-n1-standard-2"
-#   high_availability   = true
-#   create_replica      = true
-#   replica_region_list = ["us-east1", "us-west1"]
-
-#   network_name    = module.vpc_network.network_name
-#   subnet_name     = module.vpc_network.subnets["us-central1-subnet"].name
-#   private_network = true
-
-#   labels = {
-#     environment = var.environment
-#   }
-
-#   users = [
-#     {
-#       name     = var.db_username
-#       password = var.db_password
-#       roles    = ["cloudsqlsuperuser"]
-#     }
-#   ]
-# }
-
-# output "connection_string" {
-#   value = module.cloudsql_instance.connection_name
-# }
-
-# output "replica_connection_strings" {
-#   value = module.cloudsql_instance.replica_connection_names
-# }
-
-
-# module "cloudsql" {
-#   source = "terraform-google-modules/cloudsql/google"
-
-#   project_id           = "<your-project-id>"
-#   name                 = "my-cloudsql-instance"
-#   region               = "us-central1"
-#   tier                 = "db-n1-standard-1"
-#   database_version     = "POSTGRES_13"
-#   authorized_networks  = ["10.0.0.0/16"]
-#   backup_configuration = {}
-
-#   ha = true
-
-#   read_replica_zones = [
-#     "us-east1-b",
-#     "us-west1-a",
-#     "asia-east1-a",
-#   ]
-
-#   read_replica_zones_fallback = [
-#     "us-east4-a",
-#     "europe-west3-a",
-#     "asia-southeast1-a",
-#   ]
-
-#   maintenance_window = {
-#     day  = 6
-#     hour = 2
-#   }
-
-#   backup_window = {
-#     start_time = "22:00"
-#     end_time   = "02:00"
-#   }
-
-# }
-
-
-# data "cloudsql_database_instance" "primary" {
-#   name = module.cloudsql.primary_instance_name
-# }
-
-# data "cloudsql_database_instance" "replica" {
-#   name = module.cloudsql.replica_instance_name
-# }
 
 module "vpc_network" {
   source  = "terraform-google-modules/network/google"
@@ -161,13 +63,10 @@ module "vpc_network" {
   secondary_ranges = var.secondary_ranges
 }
 
-# data "google_sql_database_instance" "my_instance" {
-#   name = "my-cloudsql-instance"
-# }
-
-# data "google_sql_database_instances" "name" {
-
-# }
+data "google_compute_image" "boot" {
+  project = split("/", var.boot_image)[0]
+  family  = split("/", var.boot_image)[1]
+}
 
 
 resource "google_compute_instance" "pgbouncer_instance" {
@@ -179,12 +78,12 @@ resource "google_compute_instance" "pgbouncer_instance" {
     # Install PgBouncer and Cloud SQL Proxy
     "pgbouncer-version"       = "1.15.0"
     "cloud-sql-proxy-version" = "1.28.0"
-    user-data                 = data.template_cloudinit_config.cloud_config.rendered
+    user-data                 = data.cloudinit_config.cloud_config.rendered
   }
 
   boot_disk {
     initialize_params {
-      image = "debian-cloud/debian-10"
+      image = data.google_compute_image.boot.self_link
       size  = "10"
     }
   }
@@ -213,6 +112,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
 
   depends_on = [
     module.vpc_network
+
   ]
 
 }

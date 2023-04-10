@@ -184,7 +184,7 @@ variable "max_db_connections" {
 variable "max_client_conn" {
   description = "The maximum number of server connections per database (regardless of user). 0 is unlimited."
   type        = number
-  default     = 0
+  default     = 10
 }
 
 variable "custom_config" {
@@ -196,4 +196,10 @@ variable "custom_config" {
 variable "pgbouncer_image_tag" {
   description = "The tag to use for the base PgBouncer `edoburu/pgbouncer` Docker image used by this module."
   default     = "latest"
+}
+
+variable "boot_image" {
+  description = "The boot image used by PgBouncer instances. Defaults to the latest LTS Container Optimized OS version. Must be an image compatible with cloud-init (https://cloud-init.io)."
+  type        = string
+  default     = "cos-cloud/cos-101-lts"
 }
