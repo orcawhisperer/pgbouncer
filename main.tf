@@ -1,7 +1,9 @@
 provider "google" {
   project = var.project_id
-  region  = "us-central1"
+  region  = var.region
+  # zone    = var.zone
 }
+
 
 
 locals {
@@ -26,6 +28,23 @@ locals {
   )
 }
 
+# Define the cloud-init configuration for the instance
+# data "template_cloudinit_config" "pgbouncer_cloudinit" {
+
+#   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
+#   vars = {
+#     image       = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
+#     listen_port = var.listen_port
+#     config      = base64encode(local.cloud_config)
+#     userlist    = base64encode(local.userlist)
+#   }
+
+#   part {
+#     content_type = "text/cloud-config"
+#     content      = data.template_cloudinit_config.pgbouncer_cloudinit.rendered
+#   }
+# }
+
 data "template_file" "cloud_config" {
   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
   vars = {
@@ -36,7 +55,7 @@ data "template_file" "cloud_config" {
   }
 }
 
-data "cloudinit_config" "cloud_config" {
+data "template_cloudinit_config" "cloud_config" {
   gzip          = false
   base64_encode = false
   part {
@@ -160,7 +179,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
     # Install PgBouncer and Cloud SQL Proxy
     "pgbouncer-version"       = "1.15.0"
     "cloud-sql-proxy-version" = "1.28.0"
-    user-data                 = data.cloudinit_config.cloud_config.rendered
+    user-data                 = data.template_cloudinit_config.cloud_config.rendered
   }
 
   boot_disk {
