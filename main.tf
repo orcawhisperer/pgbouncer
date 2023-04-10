@@ -3,6 +3,49 @@ provider "google" {
   region  = "us-central1"
 }
 
+
+locals {
+  users    = [for u in var.users : ({ name = u.name, password = substr(u.password, 0, 3) == "md5" ? u.password : "md5${md5("${u.password}${u.name}")}" })]
+  admins   = [for u in var.users : u.name if lookup(u, "admin", false) == true]
+  userlist = templatefile("${path.module}/templates/userlist.txt.tmpl", { users = local.users })
+  cloud_config = templatefile(
+    "${path.module}/templates/pgbouncer.ini.tmpl",
+    {
+      db_host            = var.database_host
+      db_port            = var.database_port
+      listen_port        = var.listen_port
+      auth_user          = var.auth_user
+      auth_query         = var.auth_query
+      default_pool_size  = var.default_pool_size
+      max_db_connections = var.max_db_connections
+      max_client_conn    = var.max_client_conn
+      pool_mode          = var.pool_mode
+      admin_users        = join(",", local.admins)
+      custom_config      = var.custom_config
+    }
+  )
+}
+
+data "template_file" "cloud_config" {
+  template = file("${path.module}/templates/cloud-init.yaml.tmpl")
+  vars = {
+    image       = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
+    listen_port = var.listen_port
+    config      = base64encode(local.cloud_config)
+    userlist    = base64encode(local.userlist)
+  }
+}
+
+data "cloudinit_config" "cloud_config" {
+  gzip          = false
+  base64_encode = false
+  part {
+    filename     = "cloud-init.yaml"
+    content_type = "text/cloud-config"
+    content      = data.template_file.cloud_config.rendered
+  }
+}
+
 # module "cloudsql_instance" {
 #   source = "terraform-google-modules/sql-db/google//modules/postgres"
 
@@ -91,50 +134,12 @@ module "vpc_network" {
   source  = "terraform-google-modules/network/google"
   version = "5.1.0"
 
-  project_id   = "<your-project-id>"
-  network_name = "my-custom-vpc"
+  project_id   = var.project_id
+  network_name = var.network_name
 
-  subnets = [
-    {
-      subnet_name           = "us-central1-subnet"
-      subnet_ip             = "10.0.1.0/24"
-      subnet_region         = "us-central1"
-      subnet_private_access = true
-    },
-    {
-      subnet_name           = "us-east1-subnet"
-      subnet_ip             = "10.0.2.0/24"
-      subnet_region         = "us-east1"
-      subnet_private_access = true
-    },
-    {
-      subnet_name           = "us-west1-subnet"
-      subnet_ip             = "10.0.3.0/24"
-      subnet_region         = "us-west1"
-      subnet_private_access = true
-    },
-  ]
+  subnets = var.subnets
 
-  secondary_ranges = {
-    us-central1-subnet = [
-      {
-        range_name    = "us-central1-subnet"
-        ip_cidr_range = "10.0.1.128/25"
-      }
-    ],
-    us-east1-subnet = [
-      {
-        range_name    = "us-east1-subnet"
-        ip_cidr_range = "10.0.2.128/25"
-      }
-    ],
-    us-west1-subnet = [
-      {
-        range_name    = "us-west1-subnet"
-        ip_cidr_range = "10.0.3.128/25"
-      }
-    ]
-  }
+  secondary_ranges = var.secondary_ranges
 }
 
 # data "google_sql_database_instance" "my_instance" {
@@ -155,6 +160,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
     # Install PgBouncer and Cloud SQL Proxy
     "pgbouncer-version"       = "1.15.0"
     "cloud-sql-proxy-version" = "1.28.0"
+    user-data                 = data.cloudinit_config.cloud_config.rendered
   }
 
   boot_disk {
@@ -164,43 +170,9 @@ resource "google_compute_instance" "pgbouncer_instance" {
     }
   }
 
-  metadata_startup_script = <<-SCRIPT
-    # Start the Cloud SQL Proxy and connect to the primary CloudSQL instance and read replica
-    /cloud_sql_proxy \
-      -instances=<INSTANCE_CONNECTION_NAME>=tcp:5432,<READ_REPLICA_CONNECTION_NAME>=tcp:5432 \
-      -credential_file=/var/secrets/cloudsql/credentials.json \
-      &
 
-    # Start PgBouncer
-    pgbouncer /etc/pgbouncer/pgbouncer.ini \
-      &
 
-    # Wait for PgBouncer to start up
-    sleep 5
-
-    # Create the PgBouncer user database and users
-    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "CREATE DATABASE ${var.db_name}"
-    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "CREATE USER ${var.db_user}"
-    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "ALTER USER ${var.db_user} PASSWORD '${var.db_password}'"
-    PGPASSWORD=${var.db_password} psql -h localhost -p 6432 -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${var.db_name} TO ${var.db_user}"
-
-    # Configure PgBouncer
-    echo "[databases]" > /etc/pgbouncer/userlist.txt
-    echo "<INSTANCE_CONNECTION_NAME>:<DB_NAME>:pgbouncer:<PGBOUNCER_PASSWORD>" >> /etc/pgbouncer/userlist.txt
-    echo "<READ_REPLICA_CONNECTION_NAME>:<DB_NAME>:pgbouncer:<PGBOUNCER_PASSWORD>" >> /etc/pgbouncer/userlist.txt
-    echo "" >> /etc/pgbouncer/userlist.txt
-    echo "[pgbouncer]" > /etc/pgbouncer/pgbouncer.ini
-    echo "listen_port = 6432" >> /etc/pgbouncer/pgbouncer.ini
-    echo "listen_addr = 0.0.0.0" >> /etc/pgbouncer/pgbouncer.ini
-    echo "auth_type = md5" >> /etc/pgbouncer/pgbouncer.ini
-    echo "auth_file = /etc/pgbouncer/userlist.txt" >> /etc/pgbouncer/pgbouncer.ini
-    echo "default_pool_size = 20" >> /etc/pgbouncer/pgbouncer.ini
-    echo "pool_mode = transaction" >> /etc/pgbouncer/pgbouncer.ini
-    echo "server_reset_query = DISCARD ALL" >> /etc/pgbouncer/pgbouncer.ini
-    echo "server_round_robin = 1" >> /etc/pgbouncer/pgbouncer.ini
-    echo "server_idle_timeout = 120" >> /etc/pgbouncer/pgbouncer.ini
-    echo "server_lifetime = 600" >> /etc/pgbouncer/pgbouncer.ini
-  SCRIPT
+  allow_stopping_for_update = true
 
   service_account {
     email  = "default"
@@ -215,9 +187,35 @@ resource "google_compute_instance" "pgbouncer_instance" {
     }
 
     subnetwork_project = module.vpc_network.project_id
-    subnetwork         = module.vpc_network.subnets["us-central1-subnet"].name
-    # subnetwork_ip      = module.vpc_network.subnets["us-central1-subnet"].ip_cidr_range
+    subnetwork         = var.subnets[0].subnet_name
   }
+
+  tags = ["pgbouncer"]
+
+  depends_on = [
+    module.vpc_network
+  ]
+
+}
+
+// add firewall rule to allow ssh access to the pgbouncer instance
+resource "google_compute_firewall" "pgbouncer_ssh" {
+  name    = "pgbouncer"
+  network = module.vpc_network.network_name
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  allow {
+    protocol = "tcp"
+    ports    = ["6432"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+
+  target_tags = ["pgbouncer"]
 }
 
 
@@ -227,3 +225,5 @@ resource "google_compute_instance" "pgbouncer_instance" {
 # output "cloudsql_instance_connection_name" {
 #   value = module.cloudsql.connection_name
 # }
+
+
