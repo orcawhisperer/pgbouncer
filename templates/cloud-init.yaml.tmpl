@@ -16,17 +16,25 @@ write_files:
         "instances": [{"instance": "${cloud_sql_instance_name}", "port": "${cloud_sql_proxy_port}"}]
       }
   - path: /etc/systemd/system/cloudsql-proxy.service
+    permissions: "0644"
+    owner: root
     content: |
       [Unit]
       Description=Cloud SQL Proxy
       After=docker.service
       Requires=docker.service
+
       [Service]
-      ExecStartPre=/usr/bin/docker pull gcr.io/cloudsql-docker/gce-proxy:1.24.0
-      ExecStart=/usr/bin/docker run --name cloudsql-proxy --privileged --network=host --detach gcr.io/cloudsql-docker/gce-proxy:1.24.0 /cloud_sql_proxy \
-        -instances=${project_id}:${region}:${cloud_sql_instance_name}=tcp:${cloud_sql_proxy_port} 
-       # -credential_file=/etc/cloudsql/key.json
+      StandardOutput=file:/var/log/cloudsql-proxy.log
+      StandardError=file:/var/log/cloudsql-proxy.log
+      Restart=always
+      ExecStart=/usr/bin/docker run
+        --name cloudsql-proxy --privileged --network=host --detach \
+        --restart always \
+        ${cloud_sql_proxy_image} \
+        ${cloud_sql_instance_name}
       ExecStop=/usr/bin/docker stop cloudsql-proxy
+      ExecStopPost=/usr/bin/docker rm cloudsql-proxy
       [Install]
       WantedBy=multi-user.target
   - path: /etc/systemd/system/pgbouncer.service
@@ -35,23 +43,28 @@ write_files:
     content: |
       [Unit]
       Description=Start PgBouncer
+      After=docker.service
+      Requires=docker.service
 
       [Service]
       StandardOutput=file:/var/log/pgbouncer.log
       StandardError=file:/var/log/pgbouncer.log
+      Restart=always
       ExecStart=/usr/bin/docker run \
         --name pgbouncer \
         --restart always \
-        -p ${listen_port}:${listen_port} \
+        --network=host \ 
         -v /run/user/userlist.txt:/etc/pgbouncer/userlist.txt:ro \
         -v /run/user/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro \
         ${image}
       ExecStop=/usr/bin/docker stop pgbouncer
       ExecStopPost=/usr/bin/docker rm pgbouncer
+      [Install]
+      WantedBy=multi-user.target
 runcmd:
   - systemctl daemon-reload
-  - systemctl enable cloudsql-proxy
-  - systemctl start cloudsql-proxy
-  - systemctl start pgbouncer
-  - systemctl enable pgbouncer
+  - systemctl enable cloudsql-proxy.service
+  - systemctl enable pgbouncer.service
+  - systemctl start cloudsql-proxy.service
+  - systemctl start pgbouncer.service
   

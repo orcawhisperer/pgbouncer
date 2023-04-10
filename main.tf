@@ -37,7 +37,7 @@ data "template_file" "cloud_config" {
     config                  = base64encode(local.cloud_config)
     userlist                = base64encode(local.userlist)
     project_id              = var.project_id
-    region                  = var.region
+    cloud_sql_proxy_image   = var.cloud_sql_proxy_image
     cloud_sql_instance_name = var.database_connection_name
     cloud_sql_proxy_port    = var.cloud_sql_proxy_port
   }
@@ -79,11 +79,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
   zone         = "us-central1-a"
 
   metadata = {
-    # Install PgBouncer and Cloud SQL Proxy
-    "pgbouncer-version"       = "1.15.0"
-    "cloud-sql-proxy-version" = "1.28.0"
-    user-data                 = data.cloudinit_config.cloud_config.rendered
-    startup-script            = local.startup_script
+    user-data = data.cloudinit_config.cloud_config.rendered
   }
 
   boot_disk {
@@ -98,7 +94,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
   allow_stopping_for_update = true
 
   service_account {
-    email  = "default"
+    email  = module.cloud_sql_proxy_service_account.email
     scopes = ["cloud-platform"]
   }
 
@@ -138,7 +134,7 @@ resource "google_compute_firewall" "pgbouncer" {
 
   allow {
     protocol = "tcp"
-    ports    = ["3307"]
+    ports    = ["1433"]
   }
 
   source_ranges = ["0.0.0.0/0"]
@@ -146,6 +142,20 @@ resource "google_compute_firewall" "pgbouncer" {
   target_tags = ["pgbouncer"]
 }
 
+
+
+# Create a service account for the Cloud SQL Proxy using google terraform modules
+
+module "cloud_sql_proxy_service_account" {
+  source  = "terraform-google-modules/service-accounts/google"
+  version = "3.0.0"
+
+  project_id = var.project_id
+  names      = ["cloud-sql-proxy"]
+  project_roles = [
+    "${var.project_id}=>roles/cloudsql.admin",
+  ]
+}
 
 
 

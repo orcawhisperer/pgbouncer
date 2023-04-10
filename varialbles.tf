@@ -217,7 +217,13 @@ variable "cloud_sql_proxy_download_url" {
 }
 
 variable "cloud_sql_proxy_port" {
-  default     = 3307
+  default     = 1433
   type        = number
   description = "The port to use for the cloud_sql_proxy to listen on."
+}
+
+variable "cloud_sql_proxy_image" {
+  default     = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.2"
+  type        = string
+  description = "The image to use for the cloud_sql_proxy container."
 }
