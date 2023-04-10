@@ -29,7 +29,7 @@ locals {
   )
   startup_script = templatefile("${path.module}/templates/startup-script.sh.tmpl", {
     cloud_sql_proxy_download_url = var.cloud_sql_proxy_download_url
-    database_connection_name     = var.database_host
+    database_connection_name     = var.database_connection_name
   })
 }
 

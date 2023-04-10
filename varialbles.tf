@@ -115,13 +115,19 @@ variable "db_instance_connection_name" {
 variable "database_host" {
   description = "The host address of the Cloud SQL instance to connect to."
   type        = string
+  default     = "/cloudsql/sapient-helix-352609:us-central1:pg-ha-6c8f5ad3"
+}
+
+variable "database_connection_name" {
+  description = "value of database connection name"
+  type        = string
   default     = "sapient-helix-352609:us-central1:pg-ha-6c8f5ad3"
 }
 
 variable "database_port" {
   description = "The port to connect to the database with."
   type        = number
-  default     = 5432
+  default     = 0
 }
 
 variable "listen_port" {
