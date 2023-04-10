@@ -27,19 +27,19 @@ locals {
       custom_config      = var.custom_config
     }
   )
-  startup_script = templatefile("${path.module}/templates/startup-script.sh.tmpl", {
-    cloud_sql_proxy_download_url = var.cloud_sql_proxy_download_url
-    database_connection_name     = var.database_connection_name
-  })
 }
 
 data "template_file" "cloud_config" {
   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
   vars = {
-    image       = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
-    listen_port = var.listen_port
-    config      = base64encode(local.cloud_config)
-    userlist    = base64encode(local.userlist)
+    image                   = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
+    listen_port             = var.listen_port
+    config                  = base64encode(local.cloud_config)
+    userlist                = base64encode(local.userlist)
+    project_id              = var.project_id
+    region                  = var.region
+    cloud_sql_instance_name = var.database_connection_name
+    cloud_sql_proxy_port    = var.cloud_sql_proxy_port
   }
 }
 

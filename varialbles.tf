@@ -215,3 +215,9 @@ variable "cloud_sql_proxy_download_url" {
   type        = string
   description = "The URL to download the cloud_sql_proxy binary from."
 }
+
+variable "cloud_sql_proxy_port" {
+  default     = 3307
+  type        = number
+  description = "The port to use for the cloud_sql_proxy to listen on."
+}

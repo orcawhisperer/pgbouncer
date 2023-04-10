@@ -9,6 +9,26 @@ write_files:
     permissions: "0644"
     encoding: b64
     content: ${userlist}
+  - path: /etc/docker/cloudsql-config.json
+    content: |
+      {
+        "projects": ["${project_id}"],
+        "instances": [{"instance": "${cloud_sql_instance_name}", "port": "${cloud_sql_proxy_port}"}]
+      }
+  - path: /etc/systemd/system/cloudsql-proxy.service
+    content: |
+      [Unit]
+      Description=Cloud SQL Proxy
+      After=docker.service
+      Requires=docker.service
+      [Service]
+      ExecStartPre=/usr/bin/docker pull gcr.io/cloudsql-docker/gce-proxy:1.24.0
+      ExecStart=/usr/bin/docker run --name cloudsql-proxy --privileged --network=host --detach gcr.io/cloudsql-docker/gce-proxy:1.24.0 /cloud_sql_proxy \
+        -instances=${project_id}:${region}:${cloud_sql_instance_name}=tcp:${cloud_sql_proxy_port} 
+       # -credential_file=/etc/cloudsql/key.json
+      ExecStop=/usr/bin/docker stop cloudsql-proxy
+      [Install]
+      WantedBy=multi-user.target
   - path: /etc/systemd/system/pgbouncer.service
     permissions: "0644"
     owner: root
@@ -30,4 +50,8 @@ write_files:
       ExecStopPost=/usr/bin/docker rm pgbouncer
 runcmd:
   - systemctl daemon-reload
-  - systemctl start pgbouncer.service
+  - systemctl enable cloudsql-proxy
+  - systemctl start cloudsql-proxy
+  - systemctl start pgbouncer
+  - systemctl enable pgbouncer
+  
