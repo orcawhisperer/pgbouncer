@@ -27,6 +27,10 @@ locals {
       custom_config      = var.custom_config
     }
   )
+  startup_script = templatefile("${path.module}/templates/startup-script.sh.tmpl", {
+    cloud_sql_proxy_download_url = var.cloud_sql_proxy_download_url
+    database_connection_name     = var.database_host
+  })
 }
 
 data "template_file" "cloud_config" {
@@ -79,6 +83,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
     "pgbouncer-version"       = "1.15.0"
     "cloud-sql-proxy-version" = "1.28.0"
     user-data                 = data.cloudinit_config.cloud_config.rendered
+    startup-script            = local.startup_script
   }
 
   boot_disk {
@@ -112,13 +117,12 @@ resource "google_compute_instance" "pgbouncer_instance" {
 
   depends_on = [
     module.vpc_network
-
   ]
 
 }
 
 // add firewall rule to allow ssh access to the pgbouncer instance
-resource "google_compute_firewall" "pgbouncer_ssh" {
+resource "google_compute_firewall" "pgbouncer" {
   name    = "pgbouncer"
   network = module.vpc_network.network_name
 
@@ -132,6 +136,11 @@ resource "google_compute_firewall" "pgbouncer_ssh" {
     ports    = ["6432"]
   }
 
+  allow {
+    protocol = "tcp"
+    ports    = ["3307"]
+  }
+
   source_ranges = ["0.0.0.0/0"]
 
   target_tags = ["pgbouncer"]
@@ -139,10 +148,5 @@ resource "google_compute_firewall" "pgbouncer_ssh" {
 
 
 
-
-
-# output "cloudsql_instance_connection_name" {
-#   value = module.cloudsql.connection_name
-# }
 
 

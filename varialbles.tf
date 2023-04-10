@@ -203,3 +203,9 @@ variable "boot_image" {
   type        = string
   default     = "cos-cloud/cos-101-lts"
 }
+
+variable "cloud_sql_proxy_download_url" {
+  default     = "https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64"
+  type        = string
+  description = "The URL to download the cloud_sql_proxy binary from."
+}
