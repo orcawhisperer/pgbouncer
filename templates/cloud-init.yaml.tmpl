@@ -20,21 +20,19 @@ write_files:
     owner: root
     content: |
       [Unit]
+      Type=oneshot
       Description=Cloud SQL Proxy
       After=docker.service
-      Requires=docker.service
 
       [Service]
-      StandardOutput=file:/var/log/cloudsql-proxy.log
-      StandardError=file:/var/log/cloudsql-proxy.log
-      Restart=always
-      ExecStart=/usr/bin/docker run
-        --name cloudsql-proxy --privileged --network=host --detach \
-        --restart always \
-        ${cloud_sql_proxy_image} \
-        ${cloud_sql_instance_name}
+      ExecPre=/usr/bin/docker network create cloudsql-pgbouncer
+      ExecStart=/usr/bin/docker run --name cloudsql-proxy --detach --restart always \
+        --network cloudsql-pgbouncer \
+        -p ${cloud_sql_proxy_port}:${cloud_sql_proxy_port} \
+        ${cloud_sql_proxy_image} ${cloud_sql_instance_name}
       ExecStop=/usr/bin/docker stop cloudsql-proxy
       ExecStopPost=/usr/bin/docker rm cloudsql-proxy
+      RemainAfterExit=yes
       [Install]
       WantedBy=multi-user.target
   - path: /etc/systemd/system/pgbouncer.service
@@ -42,23 +40,24 @@ write_files:
     owner: root
     content: |
       [Unit]
+      Type=oneshot
       Description=Start PgBouncer
       After=docker.service
-      Requires=docker.service
+      After=cloudsql-proxy.service
 
       [Service]
-      StandardOutput=file:/var/log/pgbouncer.log
-      StandardError=file:/var/log/pgbouncer.log
-      Restart=always
       ExecStart=/usr/bin/docker run \
         --name pgbouncer \
         --restart always \
-        --network=host \ 
+        --detach \
+        --network cloudsql-pgbouncer \
+        -p ${listen_port}:${listen_port} \
         -v /run/user/userlist.txt:/etc/pgbouncer/userlist.txt:ro \
         -v /run/user/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro \
         ${image}
       ExecStop=/usr/bin/docker stop pgbouncer
       ExecStopPost=/usr/bin/docker rm pgbouncer
+      RemainAfterExit=yes
       [Install]
       WantedBy=multi-user.target
 runcmd:

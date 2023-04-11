@@ -127,7 +127,7 @@ variable "database_connection_name" {
 variable "database_port" {
   description = "The port to connect to the database with."
   type        = number
-  default     = 0
+  default     = 5432
 }
 
 variable "listen_port" {
@@ -226,4 +226,10 @@ variable "cloud_sql_proxy_image" {
   default     = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.2"
   type        = string
   description = "The image to use for the cloud_sql_proxy container."
+}
+
+variable "cloud_sql_proxy_host" {
+  default     = "127.0.0.1"
+  type        = string
+  description = "The host to use for the cloud_sql_proxy to listen on."
 }

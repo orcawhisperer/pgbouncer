@@ -14,8 +14,8 @@ locals {
   cloud_config = templatefile(
     "${path.module}/templates/pgbouncer.ini.tmpl",
     {
-      db_host            = var.database_host
-      db_port            = var.database_port
+      db_host            = var.cloud_sql_proxy_host
+      db_port            = var.cloud_sql_proxy_port
       listen_port        = var.listen_port
       auth_user          = var.auth_user
       auth_query         = var.auth_query
@@ -43,7 +43,7 @@ data "template_file" "cloud_config" {
   }
 }
 
-data "cloudinit_config" "cloud_config" {
+data "template_cloudinit_config" "cloud_config" {
   gzip          = false
   base64_encode = false
   part {
@@ -79,7 +79,7 @@ resource "google_compute_instance" "pgbouncer_instance" {
   zone         = "us-central1-a"
 
   metadata = {
-    user-data = data.cloudinit_config.cloud_config.rendered
+    user-data = data.template_cloudinit_config.cloud_config.rendered
   }
 
   boot_disk {
