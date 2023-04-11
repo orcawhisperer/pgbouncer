@@ -4,6 +4,9 @@ provider "google" {
   # zone    = var.zone
 }
 
+resource "random_id" "suffix" {
+  byte_length = 5
+}
 
 
 
@@ -134,7 +137,7 @@ resource "google_compute_firewall" "pgbouncer" {
 
   allow {
     protocol = "tcp"
-    ports    = ["1433"]
+    ports    = ["5432"]
   }
 
   source_ranges = ["0.0.0.0/0"]
@@ -157,6 +160,62 @@ module "cloud_sql_proxy_service_account" {
   ]
 }
 
+
+# module "db_network" {
+#   source  = "terraform-google-modules/network/google"
+#   version = "5.1.0"
+
+#   project_id   = var.project_id
+#   network_name = var.db_network
+
+#   subnets = var.db_subnets
+# }
+
+module "private_service_access" {
+  source  = "GoogleCloudPlatform/sql-db/google//modules/private_service_access"
+  version = "~>5.0.0"
+
+
+
+  project_id  = var.project_id
+  vpc_network = data.google_compute_subnetwork.db_subnet.self_link
+  depends_on  = [module.vpc_network]
+}
+
+data "google_compute_subnetwork" "db_subnet" {
+  name   = var.subnets[0].subnet_name
+  region = var.region
+}
+
+
+# Create Postgres HA Cloud SQL instance using google terraform modules
+module "db" {
+  source  = "GoogleCloudPlatform/sql-db/google//modules/postgresql"
+  version = "~>5.0.0"
+
+  project_id = var.project_id
+  name       = "db-${random_id.suffix.hex}"
+
+  database_version = "POSTGRES_12"
+  region           = var.region
+  zone             = var.zone
+  tier             = "db-f1-micro"
+
+  db_name       = var.db_name
+  user_name     = var.db_user
+  user_password = var.db_password
+
+  availability_type = "REGIONAL"
+
+  ip_configuration = {
+    ipv4_enabled        = false
+    private_network     = data.google_compute_subnetwork.db_subnet.self_link
+    require_ssl         = false
+    authorized_networks = []
+  }
+
+  # module_depends_on = [module.private_service_access.peering_completed]
+}
 
 
 

@@ -10,11 +10,53 @@ variable "region" {
   description = "value of region"
 }
 
+variable "zone" {
+  type        = string
+  default     = "us-central1-a"
+  description = "value of zone"
+}
+
 variable "network_name" {
   type        = string
   default     = "pgbouncer-network"
   description = "value of network name"
 }
+
+variable "db_network" {
+  type        = string
+  default     = "db-network"
+  description = "value of network name"
+}
+
+variable "db_subnets" {
+  type = list(object({
+    subnet_name           = string
+    subnet_ip             = string
+    subnet_region         = string
+    subnet_private_access = bool
+  }))
+  default = [
+    {
+      subnet_name           = "us-central1-subnet"
+      subnet_ip             = "100.0.1.0/24"
+      subnet_region         = "us-central1"
+      subnet_private_access = true
+    },
+    {
+      subnet_name           = "us-east1-subnet"
+      subnet_ip             = "100.0.2.0/24"
+      subnet_region         = "us-east1"
+      subnet_private_access = true
+    },
+    {
+      subnet_name           = "us-west1-subnet"
+      subnet_ip             = "100.0.3.0/24"
+      subnet_region         = "us-west1"
+      subnet_private_access = true
+    },
+  ]
+}
+
 
 variable "subnets" {
   type = list(object({
@@ -190,7 +232,7 @@ variable "max_db_connections" {
 variable "max_client_conn" {
   description = "The maximum number of server connections per database (regardless of user). 0 is unlimited."
   type        = number
-  default     = 10
+  default     = 0
 }
 
 variable "custom_config" {
@@ -217,7 +259,7 @@ variable "cloud_sql_proxy_download_url" {
 }
 
 variable "cloud_sql_proxy_port" {
-  default     = 1433
+  default     = 5432
   type        = number
   description = "The port to use for the cloud_sql_proxy to listen on."
 }
@@ -229,7 +271,7 @@ variable "cloud_sql_proxy_image" {
 }
 
 variable "cloud_sql_proxy_host" {
-  default     = "127.0.0.1"
+  default     = "cloudsql-proxy"
   type        = string
   description = "The host to use for the cloud_sql_proxy to listen on."
 }

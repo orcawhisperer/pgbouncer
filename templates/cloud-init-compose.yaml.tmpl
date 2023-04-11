@@ -8,8 +8,7 @@ write_files:
     content: |
       #!/bin/bash
       set -e
-      COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d\" -f4)
-      curl -L "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
+      curl -L "https://github.com/docker/compose/releases/download/v2.17.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/bin/docker-compose
       chmod +x /usr/bin/docker-compose
   - path: /run/user/pgbouncer.ini
     permissions: "0644"
@@ -33,7 +32,7 @@ write_files:
       services:
         cloudsql-proxy:
           image: ${cloud_sql_proxy_image}
-          command: /cloud-sql-proxy --address 0.0.0.0 --port 1433  ${cloud_sql_instance_name}
+          command: /cloud-sql-proxy --address 0.0.0.0 --port 5432  ${cloud_sql_instance_name}
           restart: always
           networks:
             - cloudsql-pgbouncer

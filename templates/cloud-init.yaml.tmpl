@@ -25,11 +25,13 @@ write_files:
       After=docker.service
 
       [Service]
+      StandardOutput=/var/log/cloudsql-proxy.log
+      StandardError=/var/log/cloudsql-proxy.log
       ExecStartPre=/usr/bin/docker network create cloudsql-pgbouncer
       ExecStart=/usr/bin/docker run --name cloudsql-proxy --detach --restart always \
         --network cloudsql-pgbouncer \
         -p ${cloud_sql_proxy_port}:${cloud_sql_proxy_port} \
-        ${cloud_sql_proxy_image} ${cloud_sql_instance_name}
+        ${cloud_sql_proxy_image} ${cloud_sql_instance_name} --address 0.0.0.0
       ExecStop=/usr/bin/docker stop cloudsql-proxy
       ExecStopPost=/usr/bin/docker rm cloudsql-proxy
       RemainAfterExit=yes
@@ -46,6 +48,8 @@ write_files:
       After=cloudsql-proxy.service
 
       [Service]
+      StandardOutput=/var/log/pgbouncer.log
+      StandardError=/var/log/pgbouncer.log
       ExecStart=/usr/bin/docker run \
         --name pgbouncer \
         --restart always \
