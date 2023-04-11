@@ -171,20 +171,21 @@ module "cloud_sql_proxy_service_account" {
 #   subnets = var.db_subnets
 # }
 
-module "private_service_access" {
-  source  = "GoogleCloudPlatform/sql-db/google//modules/private_service_access"
-  version = "~>5.0.0"
+# module "private_service_access" {
+#   source  = "GoogleCloudPlatform/sql-db/google//modules/private_service_access"
+#   version = "~>5.0.0"
 
+#   project_id  = var.project_id
+#   vpc_network = var.network_name
 
+#   depends_on = [
+#     module.vpc_network
+#   ]
+# }
 
-  project_id  = var.project_id
-  vpc_network = data.google_compute_subnetwork.db_subnet.self_link
-  depends_on  = [module.vpc_network]
-}
-
-data "google_compute_subnetwork" "db_subnet" {
-  name   = var.subnets[0].subnet_name
-  region = var.region
+data "google_compute_network" "network" {
+  project = var.project_id
+  name    = var.network_name
 }
 
 
@@ -208,10 +209,15 @@ module "db" {
   availability_type = "REGIONAL"
 
   ip_configuration = {
-    ipv4_enabled        = false
-    private_network     = data.google_compute_subnetwork.db_subnet.self_link
-    require_ssl         = false
-    authorized_networks = []
+    ipv4_enabled    = true
+    private_network = data.google_compute_network.network.self_link
+    require_ssl     = false
+    authorized_networks = [
+      {
+        name  = "${var.project_id}-cidr"
+        value = var.subnets[0].subnet_ip
+      }
+    ]
   }
 
   # module_depends_on = [module.private_service_access.peering_completed]
