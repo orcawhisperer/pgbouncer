@@ -25,7 +25,7 @@ write_files:
       After=docker.service
 
       [Service]
-      ExecPre=/usr/bin/docker network create cloudsql-pgbouncer
+      ExecStartPre=/usr/bin/docker network create cloudsql-pgbouncer
       ExecStart=/usr/bin/docker run --name cloudsql-proxy --detach --restart always \
         --network cloudsql-pgbouncer \
         -p ${cloud_sql_proxy_port}:${cloud_sql_proxy_port} \
