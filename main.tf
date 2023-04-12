@@ -1,8 +1,3 @@
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
-
 resource "random_id" "suffix" {
   byte_length = 5
 }
