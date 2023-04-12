@@ -1,9 +1,0 @@
-# start-up script
-
-# Install Cloud SQL Proxy
-wget ${cloud_sql_proxy_download_url} -O cloud_sql_proxy
-chmod +x cloud_sql_proxy
-mv cloud_sql_proxy /usr/local/bin/
-# Set up environment variables
-export CLOUD_SQL_PROXY=/usr/local/bin/cloud_sql_proxy
-export CLOUD_SQL_INSTANCE=${database_connection_name}

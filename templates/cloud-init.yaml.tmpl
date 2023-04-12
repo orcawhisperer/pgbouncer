@@ -9,12 +9,6 @@ write_files:
     permissions: "0644"
     encoding: b64
     content: ${userlist}
-  - path: /etc/docker/cloudsql-config.json
-    content: |
-      {
-        "projects": ["${project_id}"],
-        "instances": [{"instance": "${cloud_sql_instance_name}", "port": "${cloud_sql_proxy_port}"}]
-      }
   - path: /etc/systemd/system/cloudsql-proxy.service
     permissions: "0644"
     owner: root
@@ -31,7 +25,7 @@ write_files:
       ExecStart=/usr/bin/docker run --name cloudsql-proxy --detach --restart always \
         --network cloudsql-pgbouncer \
         -p ${cloud_sql_proxy_port}:${cloud_sql_proxy_port} \
-        ${cloud_sql_proxy_image} ${cloud_sql_instance_name} --address 0.0.0.0
+        ${cloud_sql_proxy_image} ${cloud_sql_instance_name} ${cloud_sql_replica_name} --address 0.0.0.0 --private-ip
       ExecStop=/usr/bin/docker stop cloudsql-proxy
       ExecStopPost=/usr/bin/docker rm cloudsql-proxy
       RemainAfterExit=yes

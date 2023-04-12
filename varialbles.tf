@@ -22,42 +22,6 @@ variable "network_name" {
   description = "value of network name"
 }
 
-variable "db_network" {
-  type        = string
-  default     = "db-network"
-  description = "value of network name"
-}
-
-variable "db_subnets" {
-  type = list(object({
-    subnet_name           = string
-    subnet_ip             = string
-    subnet_region         = string
-    subnet_private_access = bool
-  }))
-  default = [
-    {
-      subnet_name           = "us-central1-subnet"
-      subnet_ip             = "100.0.1.0/24"
-      subnet_region         = "us-central1"
-      subnet_private_access = true
-    },
-    {
-      subnet_name           = "us-east1-subnet"
-      subnet_ip             = "100.0.2.0/24"
-      subnet_region         = "us-east1"
-      subnet_private_access = true
-    },
-    {
-      subnet_name           = "us-west1-subnet"
-      subnet_ip             = "100.0.3.0/24"
-      subnet_region         = "us-west1"
-      subnet_private_access = true
-    },
-  ]
-}
-
-
 variable "subnets" {
   type = list(object({
     subnet_name           = string
@@ -114,18 +78,6 @@ variable "secondary_ranges" {
   }
 }
 
-variable "instance_name" {
-  type        = string
-  default     = "instance-1"
-  description = "value of instance name"
-}
-
-variable "environment" {
-  type        = string
-  default     = "dev"
-  description = "value of environment"
-}
-
 variable "db_name" {
   type        = string
   default     = "test"
@@ -144,34 +96,6 @@ variable "db_password" {
   description = "value of db password"
 }
 
-# Define variables
-variable "db_instance_connection_name" {
-  type        = string
-  description = "The connection name of the Cloud SQL instance"
-  default     = "sapient-helix-352609:us-central1:pg-ha-6c8f5ad3"
-}
-
-
-
-
-variable "database_host" {
-  description = "The host address of the Cloud SQL instance to connect to."
-  type        = string
-  default     = "/cloudsql/sapient-helix-352609:us-central1:pg-ha-6c8f5ad3"
-}
-
-variable "database_connection_name" {
-  description = "value of database connection name"
-  type        = string
-  default     = "sapient-helix-352609:us-central1:pg-ha-6c8f5ad3"
-}
-
-variable "database_port" {
-  description = "The port to connect to the database with."
-  type        = number
-  default     = 5432
-}
-
 variable "listen_port" {
   description = "The port used by PgBouncer to listen on."
   type        = number
@@ -179,7 +103,7 @@ variable "listen_port" {
 }
 
 variable "users" {
-  description = "The list of users to be created in PgBouncer's userlist.txt. Passwords can be provided as plain-text or md5 hashes."
+  description = "The list of users to be created in PgBouncer's userlist.txt. Passwords can be provided as plain-text."
   type        = list(any)
   default = [
     {
@@ -224,15 +148,15 @@ variable "max_client_connections" {
 }
 
 variable "max_db_connections" {
-  description = "The maximum number of server connections per database (regardless of user). 0 is unlimited."
+  description = "The maximum number of server connections per database (regardless of user)."
   type        = number
-  default     = 0
+  default     = 100
 }
 
 variable "max_client_conn" {
-  description = "The maximum number of server connections per database (regardless of user). 0 is unlimited."
+  description = "The maximum number of server connections per database (regardless of user)."
   type        = number
-  default     = 0
+  default     = 100
 }
 
 variable "custom_config" {
@@ -252,12 +176,6 @@ variable "boot_image" {
   default     = "cos-cloud/cos-101-lts"
 }
 
-variable "cloud_sql_proxy_download_url" {
-  default     = "https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64"
-  type        = string
-  description = "The URL to download the cloud_sql_proxy binary from."
-}
-
 variable "cloud_sql_proxy_port" {
   default     = 5432
   type        = number
@@ -275,3 +193,6 @@ variable "cloud_sql_proxy_host" {
   type        = string
   description = "The host to use for the cloud_sql_proxy to listen on."
 }
+
+
+
