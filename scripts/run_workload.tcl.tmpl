@@ -1,0 +1,25 @@
+#!/biin/tclsh
+puts "SETTING CONFIGURATION"
+global complete
+proc wait_to_complete {} {
+global complete
+set complete [vucomplete]
+if {!$complete} { after 5000 wait_to_complete } else { exit }
+}
+dbset bm TPROC-C
+diset tpcc pg_count_ware 1
+diset tpcc pg_num_vu 1
+diset tpcc pg_driver timed
+diset tpcc pg_allwarehouse true
+buildschema
+vudestroy
+vustatus
+loadscript
+vuset vu 4
+vucreate
+vustatus
+vurun
+vudestroy
+deleteschema
+vudestroy
+wait_to_complete

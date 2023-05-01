@@ -1,6 +1,30 @@
 #cloud-config
 
 write_files:
+  - path: /run/user/start_all_services.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${start_all_services}
+  - path: /run/user/stop_all_services.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${stop_all_services}
+  - path: /run/user/configure-hammerdb.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${configure_hammerdb}
+  - path: /run/user/configure-hammerdb.tcl
+    permissions: "0644"
+    encoding: b64
+    content: ${configure_hammerdb_tcl}
+  - path: /run/user/run_workload.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${run_workload}
+  - path: /run/user/run_workload.tcl
+    permissions: "0644"
+    encoding: b64
+    content: ${run_workload_tcl}
   - path: /run/user/pgbouncer.ini
     permissions: "0644"
     encoding: b64
@@ -9,59 +33,24 @@ write_files:
     permissions: "0644"
     encoding: b64
     content: ${userlist}
-  - path: /etc/systemd/system/cloudsql-proxy.service
+  - path: /etc/systemd/system/demo.service
     permissions: "0644"
     owner: root
     content: |
       [Unit]
-      Type=oneshot
-      Description=Cloud SQL Proxy
+      Description=Demo
       After=docker.service
-
+      Requires=docker.service
       [Service]
-      StandardOutput=/var/log/cloudsql-proxy.log
-      StandardError=/var/log/cloudsql-proxy.log
-      ExecStartPre=/usr/bin/docker network create cloudsql-pgbouncer
-      ExecStart=/usr/bin/docker run --name cloudsql-proxy --detach --restart always \
-        --network cloudsql-pgbouncer \
-        -p ${cloud_sql_proxy_port}:${cloud_sql_proxy_port} \
-        ${cloud_sql_proxy_image} ${cloud_sql_instance_name} ${cloud_sql_replica_name} --address 0.0.0.0 --private-ip
-      ExecStop=/usr/bin/docker stop cloudsql-proxy
-      ExecStopPost=/usr/bin/docker rm cloudsql-proxy
-      RemainAfterExit=yes
-      [Install]
-      WantedBy=multi-user.target
-  - path: /etc/systemd/system/pgbouncer.service
-    permissions: "0644"
-    owner: root
-    content: |
-      [Unit]
-      Type=oneshot
-      Description=Start PgBouncer
-      After=docker.service
-      After=cloudsql-proxy.service
-
-      [Service]
-      StandardOutput=/var/log/pgbouncer.log
-      StandardError=/var/log/pgbouncer.log
-      ExecStart=/usr/bin/docker run \
-        --name pgbouncer \
-        --restart always \
-        --detach \
-        --network cloudsql-pgbouncer \
-        -p ${listen_port}:${listen_port} \
-        -v /run/user/userlist.txt:/etc/pgbouncer/userlist.txt:ro \
-        -v /run/user/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro \
-        ${image}
-      ExecStop=/usr/bin/docker stop pgbouncer
-      ExecStopPost=/usr/bin/docker rm pgbouncer
+      Type=simple
+      ExecStart=/run/user/start_all_services.sh
+      ExecStop=/run/user/stop_all_services.sh
       RemainAfterExit=yes
       [Install]
       WantedBy=multi-user.target
 runcmd:
   - systemctl daemon-reload
-  - systemctl enable cloudsql-proxy.service
-  - systemctl enable pgbouncer.service
-  - systemctl start cloudsql-proxy.service
-  - systemctl start pgbouncer.service
+  - systemctl enable demo.service
+  - systemctl start demo.service
+
   

@@ -7,7 +7,7 @@ listen_port = ${listen_port}
 unix_socket_dir =
 user = postgres
 auth_file = /etc/pgbouncer/userlist.txt
-auth_type = md5
+auth_type = scram-sha-256
 
 %{ if custom_config == "" ~}
 %{ if auth_query != null && auth_user != null ~}

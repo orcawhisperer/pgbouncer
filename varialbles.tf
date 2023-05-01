@@ -1,6 +1,6 @@
 variable "project_id" {
   type        = string
-  default     = "sapient-helix-352609"
+  default     = "atc-demo-cloud-sql-ha"
   description = "value of project id"
 }
 
@@ -107,15 +107,26 @@ variable "users" {
   type        = list(any)
   default = [
     {
-      name     = "admin"
-      password = "admin@123"
+      name : "admin"
+      password : "admin@123"
     },
     {
-      name : "test"
-      password : "test123"
-    },
+      name : "postgres"
+      password : "admin@123"
+    }
   ]
 }
+
+# variable "pbbouncer_users" {
+#   description = "The list of users to be created in PgBouncer's userlist.txt. Passwords can be provided as plain-text."
+#   type        = list(any)
+#   default = [
+#     {
+#       name : "admin",
+#       password : "admin@123"
+#     }
+#   ]
+# }
 
 variable "auth_user" {
   description = "Any user not specified in `users` will be queried through the `auth_query` query from `pg_shadow` in the database, using `auth_user`. The user for `auth_user` must be included in `users`."
@@ -193,6 +204,32 @@ variable "cloud_sql_proxy_host" {
   type        = string
   description = "The host to use for the cloud_sql_proxy to listen on."
 }
+
+variable "pgbouncer_host" {
+  default     = "pgbouncer"
+  type        = string
+  description = "Hostname of pgbouncer service"
+}
+
+variable "hammerdb_user" {
+  default     = "hammerdb"
+  type        = string
+  description = "Username for hammerdb"
+}
+
+variable "hammerdb_pass" {
+  default     = "hammerdb"
+  type        = string
+  description = "Password for hammerdb"
+}
+
+variable "cloud_sdk_image" {
+  default     = "gcr.io/google.com/cloudsdktool/cloud-sdk:alpine"
+  type        = string
+  description = "value of cloud sdk image"
+}
+
+
 
 
 

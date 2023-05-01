@@ -1,0 +1,18 @@
+#!bin/bash
+
+# Stop all services in the correct order
+
+echo "Stopping HammerDB container"
+docker stop hammerdb
+docker rm hammerdb
+
+echo "Stopping PGBouncer container"
+docker stop pgbouncer
+docker rm pgbouncer
+
+echo "Stopping Cloud SQL Proxy container"
+docker stop cloudsql-proxy
+docker rm cloudsql-proxy
+
+echo "Removing network"
+docker network rm demo-network

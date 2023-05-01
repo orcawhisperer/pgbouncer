@@ -3,7 +3,7 @@ resource "random_id" "suffix" {
 }
 
 locals {
-  users    = [for u in var.users : ({ name = u.name, password = substr(u.password, 0, 3) == "md5" ? u.password : "md5${md5("${u.password}${u.name}")}" })]
+  users    = [for u in var.users : ({ name = u.name, password = u.password })]
   admins   = [for u in var.users : u.name if lookup(u, "admin", false) == true]
   userlist = templatefile("${path.module}/templates/userlist.txt.tmpl", { users = local.users })
   cloud_config = templatefile(
@@ -22,15 +22,39 @@ locals {
       custom_config      = var.custom_config
     }
   )
+
+  configure_hammerdb = templatefile("${path.module}/scripts/configure_hammerdb.sh.tmpl", {})
+  configure_hammerdb_tcl = templatefile("${path.module}/scripts/configure_hammerdb.tcl.tmpl", {
+    pgbouncer_host = var.pgbouncer_host
+    pgbouncer_port = var.listen_port
+    db_user        = var.db_user
+    db_password    = var.db_password
+    hammerdb_user  = var.db_user
+    hammerdb_pass  = var.db_password
+  })
+  run_workload     = templatefile("${path.module}/scripts/run_workload.sh.tmpl", {})
+  run_workload_tcl = templatefile("${path.module}/scripts/run_workload.tcl.tmpl", {})
+
+  start_all_services = templatefile("${path.module}/scripts/start_all_services.sh.tmpl", {
+    cloud_sql_proxy_port    = var.cloud_sql_proxy_port
+    listen_port             = var.listen_port
+    cloud_sql_instance_name = module.db.instance_connection_name
+    cloud_sql_replica_name  = module.db.replicas_instance_connection_names[0]
+    cloud_sql_proxy_image   = var.cloud_sql_proxy_image
+    image                   = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
+  })
+
+  stop_all_services = templatefile("${path.module}/scripts/stop_all_services.sh.tmpl", {})
+
   read_replica_ip_configuration = {
     ipv4_enabled       = false
     require_ssl        = false
-    private_network    = data.google_compute_network.network.self_link
+    private_network    = module.vpc_network.network_self_link
     allocated_ip_range = null
     authorized_networks = [
       {
         name  = "${var.project_id}-cidr"
-        value = var.subnets[0].subnet_ip
+        value = module.vpc_network.subnets[keys(module.vpc_network.subnets)[0]].ip_cidr_range
       }
     ]
   }
@@ -48,7 +72,16 @@ data "template_file" "cloud_config" {
     cloud_sql_instance_name = module.db.instance_connection_name
     cloud_sql_replica_name  = module.db.replicas_instance_connection_names[0]
     cloud_sql_proxy_port    = var.cloud_sql_proxy_port
+    configure_hammerdb      = base64encode(local.configure_hammerdb)
+    configure_hammerdb_tcl  = base64encode(local.configure_hammerdb_tcl)
+    run_workload            = base64encode(local.run_workload)
+    run_workload_tcl        = base64encode(local.run_workload_tcl)
+    start_all_services      = base64encode(local.start_all_services)
+    stop_all_services       = base64encode(local.stop_all_services)
   }
+  depends_on = [
+    module.db,
+  ]
 }
 
 data "template_cloudinit_config" "cloud_config" {
@@ -88,23 +121,26 @@ module "activate-services" {
 
 
 module "vpc_network" {
-  source  = "terraform-google-modules/network/google"
-  version = "5.1.0"
-
-  project_id   = var.project_id
-  network_name = var.network_name
-
-  subnets = var.subnets
-
+  source           = "terraform-google-modules/network/google"
+  version          = "5.1.0"
+  project_id       = var.project_id
+  network_name     = var.network_name
+  subnets          = var.subnets
   secondary_ranges = var.secondary_ranges
+  depends_on = [
+    module.activate-services
+  ]
 }
 
 data "google_compute_image" "boot" {
   project = split("/", var.boot_image)[0]
   family  = split("/", var.boot_image)[1]
+  depends_on = [
+    module.activate-services
+  ]
 }
 
-
+# Compute instance to run pgbouncer and cloud_sql_proxy
 resource "google_compute_instance" "pgbouncer_instance" {
   name         = "pgbouncer-instance-${random_id.suffix.hex}"
   machine_type = "n1-standard-1"
@@ -112,7 +148,6 @@ resource "google_compute_instance" "pgbouncer_instance" {
 
   metadata = {
     user-data = data.template_cloudinit_config.cloud_config.rendered
-
   }
 
   boot_disk {
@@ -132,27 +167,23 @@ resource "google_compute_instance" "pgbouncer_instance" {
   }
 
   network_interface {
-    network = module.vpc_network.network_name
-
-    access_config {
-      # Use ephemeral IP address
-    }
-
+    network            = module.vpc_network.network_name
     subnetwork_project = module.vpc_network.project_id
-    subnetwork         = var.subnets[0].subnet_name
+    subnetwork         = module.vpc_network.subnets[keys(module.vpc_network.subnets)[0]].name
+    access_config {
+
+    }
   }
 
   tags = ["pgbouncer"]
 
   depends_on = [
-    module.vpc_network
+    module.db
   ]
-
-
 
 }
 
-// add firewall rule to allow ssh access to the pgbouncer instance
+# Firewall rule to allow ssh access to the pgbouncer instance
 resource "google_compute_firewall" "pgbouncer" {
   name    = "pgbouncer"
   network = module.vpc_network.network_name
@@ -176,8 +207,7 @@ resource "google_compute_firewall" "pgbouncer" {
 
 
 
-# Create a service account for the Cloud SQL Proxy using google terraform modules
-
+# Creating a service account for the Cloud SQL Proxy 
 module "cloud_sql_proxy_service_account" {
   source  = "terraform-google-modules/service-accounts/google"
   version = "3.0.0"
@@ -186,38 +216,34 @@ module "cloud_sql_proxy_service_account" {
   names      = ["cloud-sql-proxy"]
   project_roles = [
     "${var.project_id}=>roles/cloudsql.admin",
+    "${var.project_id}=>roles/storage.admin",
   ]
 }
 
-
+# Private service access for Cloud SQL
 module "private_service_access" {
   source  = "GoogleCloudPlatform/sql-db/google//modules/private_service_access"
   version = "~>5.0.0"
 
   project_id  = var.project_id
-  vpc_network = var.network_name
+  vpc_network = module.vpc_network.network_name
 
   depends_on = [
     module.vpc_network,
-    module.activate-services
   ]
 }
 
-data "google_compute_network" "network" {
-  project = var.project_id
-  name    = var.network_name
-}
 
-
-# Create Postgres HA Cloud SQL instance using google terraform modules
+# Postgres HA Cloud SQL instance
 module "db" {
   source  = "GoogleCloudPlatform/sql-db/google//modules/postgresql"
   version = "~>5.0.0"
 
-  project_id = var.project_id
-  name       = "db-pgbouncer-${random_id.suffix.hex}"
+  project_id           = var.project_id
+  name                 = "db-pgbouncer"
+  random_instance_name = true
 
-  database_version = "POSTGRES_12"
+  database_version = "POSTGRES_14"
   region           = var.region
   zone             = var.zone
   tier             = "db-f1-micro"
@@ -226,28 +252,30 @@ module "db" {
   user_name     = var.db_user
   user_password = var.db_password
 
-  additional_users = var.users
+  # additional_users = var.users
 
   availability_type = "REGIONAL"
 
+  deletion_protection = false
+
   ip_configuration = {
     ipv4_enabled    = false
-    private_network = data.google_compute_network.network.self_link
+    private_network = module.vpc_network.network_self_link
     require_ssl     = false
     authorized_networks = [
       {
         name  = "${var.project_id}-cidr"
-        value = var.subnets[0].subnet_ip
+        value = module.vpc_network.subnets[keys(module.vpc_network.subnets)[0]].ip_cidr_range
       }
     ]
   }
 
-  // Read replica configurations
-  read_replica_name_suffix = "-${random_id.suffix.hex}"
+  # Read replica configurations
+  read_replica_name_suffix = "-ha"
   read_replicas = [
     {
-      name                  = ""
-      zone                  = "us-central1-a"
+      name                  = "-0"
+      zone                  = "us-east1-b"
       availability_type     = "REGIONAL"
       tier                  = "db-f1-micro"
       ip_configuration      = local.read_replica_ip_configuration
@@ -258,6 +286,7 @@ module "db" {
       disk_type             = "PD_HDD"
       encryption_key_name   = null
       user_labels           = null
+      deletion_protection   = false
     }
   ]
 
@@ -276,14 +305,6 @@ output "db_connection_name" {
 
 output "read_replica_connection_name" {
   value = module.db.replicas_instance_connection_names
-}
-
-output "master_instance_ip" {
-  value = module.db.private_ip_address
-}
-
-output "read_replica_instance_ip" {
-  value = module.db.replicas_instance_first_ip_addresses
 }
 output "PgBouncer" {
   value = google_compute_instance.pgbouncer_instance.name
