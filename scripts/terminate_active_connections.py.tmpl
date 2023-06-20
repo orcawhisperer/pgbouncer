@@ -1,0 +1,41 @@
+# This is a sample Python script.
+
+# Press ⌃R to execute it or replace it with your code.
+# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+
+# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+import psycopg2
+from psycopg2 import Error
+
+hostname = "pgbouncer"
+port =  6432
+username = 'postgres'
+pswd = 'admin@123'
+db_name = 'postgres'
+
+del_conn_query = "SELECT\
+                  pg_terminate_backend(pid)\
+                  FROM\
+                  pg_stat_activity\
+                  WHERE\
+                 pid <> pg_backend_pid()\
+                 AND datname = 'test';";
+
+try:
+       conn = psycopg2.connect(
+              database=db_name,
+              user=username,
+              password=pswd,
+              host=hostname,
+              port=port)
+
+       print("Database connected successfully")
+
+       cur = conn.cursor()
+       cur.execute(del_conn_query)
+       res = cur.fetchone()
+       print(res)
+       conn.commit()
+
+except (Exception, Error) as error:
+    print(error)

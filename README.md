@@ -6,6 +6,7 @@
 - Pgbouncer, CloudSQL proxy and HammerDB are configured to run the Systemd service on startup
 
 /etc/systemd/system/demo.service
+
 ```bash
 [Unit]
 Description=Demo
@@ -21,14 +22,13 @@ WantedBy=multi-user.target
 ```
 
 ### Start / Stop the services
-```
+
+```bash
 systemctl start demo # This will start all the docker containers
 systemctl stop demo  # This will stop and remove all the containers
 ```
 
 Refer to the [scripts/](./scripts) directory for updating any configuration of the PgBouncer, CloudSQL proxy and HammerDB. All the config files will be copied to the server under this `/run/user` location after deployment.
-
-
 
 To update the configuration on the fly, i.e. adding new replica or remove one. You can simply ssh into the machine update the `start_all_services.sh`. Similarly you can update the configurations of PgBouncer, CloudSQL Proxy and HammerDB.
 
@@ -62,6 +62,8 @@ docker network create demo-network
         -v /run/user/configure-hammerdb.tcl:/home/hammerdb/HammerDB-4.7/configure-hammerdb.tcl \
         -v /run/user/run_workload.tcl:/home/hammerdb/HammerDB-4.7/run_workload.tcl \
         -v /run/user/run_workload.sh:/home/hammerdb/HammerDB-4.7/run_workload.sh \
+        -v /run/user/terminate_active_connections.py:/home/hammerdb/HammerDB-4.7/terminate_active_connections.py \
+        -v /run/user/clean_up.sh:/home/hammerdb/HammerDB-4.7/clean_up.sh \
         tpcorg/hammerdb:postgres  
 /usr/bin/docker exec -t hammerdb /bin/bash -c "bash /home/hammerdb/HammerDB-4.7/configure-hammerdb.sh"
 ```
@@ -72,7 +74,6 @@ Only a subset of PgBouncer's configuration are exposed as input variables. If yo
 
 The `pgbouncer.ini` template used by this module can be found [here](./templates/pgbouncer.ini.tmpl). Refer to the [official PgBouncer documentation](https://www.pgbouncer.org/config.html) for a full list of configuration options.
 
-
 ## Generating Database traffic using HammerDB
 
 ```bash
@@ -80,19 +81,24 @@ docker exec -it hammerdb bash # ssh into the docker container
 ./run_workload.sh # will start generating the database load
 ```
 
+## Clean up
 
-### Service Account
+Once the run_workload.sh script is completed you should clean up the HammerDB using the below command if you're exiting or you want to rerun the workload again.
+
+```bash
+./clean_up.sh  # will kill all the db connections and safely delete the db schema
+```
+
+## Service Account
 
 A service account with the following roles must be used to provision
 the resources of this module:
 
 - `roles/cloudsql.admin`
-
  Need to give Service Networking api the following permission
- - `roles/servicenetworking.serviceAgent`
+- `roles/servicenetworking.serviceAgent`
 
-
-### APIs
+## APIs
 
 A project with the following APIs enabled must be used to host the
 resources of this module:
@@ -101,6 +107,3 @@ resources of this module:
 - `cloudresourcemanager.googleapis.com`
 - `sqladmin.googleapis.com`
 - `servicenetworking.googleapis.com`
-
-[terraform-provider-gcp]: https://www.terraform.io/docs/providers/google/index.html
-[terraform]: https://www.terraform.io/downloads.html

@@ -1,0 +1,6 @@
+python3 terminate_active_connections.py
+echo "vudestroy" >> cleanup.tcl
+echo "deleteschema" >> cleanup.tcl
+echo "vudestroy" >> cleanup.tcl
+./hammerdbcli auto cleanup.tcl
+rm cleanup.tcl

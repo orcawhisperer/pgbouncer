@@ -29,6 +29,14 @@ write_files:
     permissions: "0644"
     encoding: b64
     content: ${config}
+  - path: /run/user/terminate_active_connections.py
+    permissions: "0755"
+    encoding: b64
+    content: ${terminate_active_connections}
+  - path: /run/user/clean_up.sh
+    permissions: "0755"
+    encoding: b64
+    content: ${clean_up}
   - path: /run/user/userlist.txt
     permissions: "0644"
     encoding: b64

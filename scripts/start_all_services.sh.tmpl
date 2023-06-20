@@ -27,5 +27,7 @@ docker network create demo-network
         -v /run/user/configure-hammerdb.tcl:/home/hammerdb/HammerDB-4.7/configure-hammerdb.tcl \
         -v /run/user/run_workload.tcl:/home/hammerdb/HammerDB-4.7/run_workload.tcl \
         -v /run/user/run_workload.sh:/home/hammerdb/HammerDB-4.7/run_workload.sh \
+        -v /run/user/terminate_active_connections.py:/home/hammerdb/HammerDB-4.7/terminate_active_connections.py \
+        -v /run/user/clean_up.sh:/home/hammerdb/HammerDB-4.7/clean_up.sh \
         tpcorg/hammerdb:postgres  
 /usr/bin/docker exec -t hammerdb /bin/bash -c "bash /home/hammerdb/HammerDB-4.7/configure-hammerdb.sh"

@@ -46,6 +46,10 @@ locals {
 
   stop_all_services = templatefile("${path.module}/scripts/stop_all_services.sh.tmpl", {})
 
+  terminate_active_connections = templatefile("${path.module}/scripts/terminate_active_connections.py.tmpl", {})
+
+  clean_up = templatefile("${path.module}/scripts/clean_up.sh.tmpl", {})
+
   read_replica_ip_configuration = {
     ipv4_enabled       = false
     require_ssl        = false
@@ -63,21 +67,23 @@ locals {
 data "template_file" "cloud_config" {
   template = file("${path.module}/templates/cloud-init.yaml.tmpl")
   vars = {
-    image                   = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
-    listen_port             = var.listen_port
-    config                  = base64encode(local.cloud_config)
-    userlist                = base64encode(local.userlist)
-    project_id              = var.project_id
-    cloud_sql_proxy_image   = var.cloud_sql_proxy_image
-    cloud_sql_instance_name = module.db.instance_connection_name
-    cloud_sql_replica_name  = module.db.replicas_instance_connection_names[0]
-    cloud_sql_proxy_port    = var.cloud_sql_proxy_port
-    configure_hammerdb      = base64encode(local.configure_hammerdb)
-    configure_hammerdb_tcl  = base64encode(local.configure_hammerdb_tcl)
-    run_workload            = base64encode(local.run_workload)
-    run_workload_tcl        = base64encode(local.run_workload_tcl)
-    start_all_services      = base64encode(local.start_all_services)
-    stop_all_services       = base64encode(local.stop_all_services)
+    image                        = "edoburu/pgbouncer:${var.pgbouncer_image_tag}"
+    listen_port                  = var.listen_port
+    config                       = base64encode(local.cloud_config)
+    userlist                     = base64encode(local.userlist)
+    project_id                   = var.project_id
+    cloud_sql_proxy_image        = var.cloud_sql_proxy_image
+    cloud_sql_instance_name      = module.db.instance_connection_name
+    cloud_sql_replica_name       = module.db.replicas_instance_connection_names[0]
+    cloud_sql_proxy_port         = var.cloud_sql_proxy_port
+    configure_hammerdb           = base64encode(local.configure_hammerdb)
+    configure_hammerdb_tcl       = base64encode(local.configure_hammerdb_tcl)
+    run_workload                 = base64encode(local.run_workload)
+    run_workload_tcl             = base64encode(local.run_workload_tcl)
+    start_all_services           = base64encode(local.start_all_services)
+    stop_all_services            = base64encode(local.stop_all_services)
+    terminate_active_connections = base64encode(local.terminate_active_connections)
+    clean_up                     = base64encode(local.clean_up)
   }
   depends_on = [
     module.db,
