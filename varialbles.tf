@@ -1,24 +1,20 @@
 variable "project_id" {
   type        = string
-  default     = "atc-demo-cloud-sql-ha"
   description = "value of project id"
 }
 
 variable "region" {
   type        = string
-  default     = "us-central1"
   description = "value of region"
 }
 
 variable "zone" {
   type        = string
-  default     = "us-central1-a"
   description = "value of zone"
 }
 
 variable "network_name" {
   type        = string
-  default     = "pgbouncer-network"
   description = "value of network name"
 }
 
@@ -86,13 +82,11 @@ variable "db_name" {
 
 variable "db_user" {
   type        = string
-  default     = "admin"
   description = "value of db username"
 }
 
 variable "db_password" {
   type        = string
-  default     = "admin@123"
   description = "value of db password"
 }
 
@@ -116,17 +110,6 @@ variable "users" {
     }
   ]
 }
-
-# variable "pbbouncer_users" {
-#   description = "The list of users to be created in PgBouncer's userlist.txt. Passwords can be provided as plain-text."
-#   type        = list(any)
-#   default = [
-#     {
-#       name : "admin",
-#       password : "admin@123"
-#     }
-#   ]
-# }
 
 variable "auth_user" {
   description = "Any user not specified in `users` will be queried through the `auth_query` query from `pg_shadow` in the database, using `auth_user`. The user for `auth_user` must be included in `users`."
