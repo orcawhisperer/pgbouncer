@@ -5,6 +5,8 @@
 - This module creates a Compute Engine instance running PgBouncer, CloudSQL proxy that sits in front of a Cloud SQL HA PostgreSQL instance and HammerDB for generating the Database load.
 - Pgbouncer, CloudSQL proxy and HammerDB are configured to run the Systemd service on startup
 
+![Architecture](/Architecture.png)
+
 /etc/systemd/system/demo.service
 
 ```bash
